@@ -1,0 +1,2 @@
+# O Gov Signals usa somente a biblioteca padrão do Python.
+# Nenhuma instalação adicional é necessária.
