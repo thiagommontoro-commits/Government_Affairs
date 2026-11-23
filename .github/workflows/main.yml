@@ -1,0 +1,57 @@
+name: Atualizar Gov Signals LATAM
+
+on:
+  schedule:
+    - cron: "0 9 * * *"        # todos os dias às 09:00 UTC = 06:00 de Brasília
+  workflow_dispatch:            # botão "Run workflow" para rodar manualmente
+    inputs:
+      forcar:
+        description: "Ignorar o cache de hoje e buscar tudo novamente"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gov-signals
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 1. Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 3. Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: 4. Gerar o arquivo index.html
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+          FORCAR: ${{ github.event.inputs.forcar || 'false' }}
+          JANELA_DIAS: "2"
+          MAX_POR_SUBTOPICO: "3"
+        run: python gerador_gov_signals.py
+
+      - name: 5. Salvar index.html e dados no repositório
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add index.html dados/
+          if git diff --cached --quiet; then
+            echo "Nada para salvar."
+            exit 0
+          fi
+          git commit -m "🏛️ Atualização diária Gov Signals LATAM ($(date -u +'%Y-%m-%d'))"
+          git pull --rebase origin ${{ github.ref_name }}
+          git push
+          echo "✅ Arquivos salvos no repositório."
